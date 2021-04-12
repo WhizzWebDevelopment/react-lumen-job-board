@@ -1,0 +1,73 @@
+version: '3.8'
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ./docker/Dockerfile
+    image: backend
+    container_name: job-board-backend
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend/:/var/www
+      - ./backend/docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+  webserver:
+    image: nginx:1.20-alpine
+    container_name: job-board-webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend/:/var/www
+      - ./backend/docker/nginx/conf.d/:/etc/nginx/conf.d/
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  db:
+    image: mysql:5.7
+    container_name: job-board-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: lumen
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./backend/docker/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+    image: frontend
+    container_name: job-board-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_BASE_URL=http://localhost:8000/api
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/var/www
+      - /var/www/node_modules
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
